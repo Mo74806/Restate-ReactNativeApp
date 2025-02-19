@@ -5,7 +5,7 @@ import { useDebouncedCallback } from "use-debounce";
 import icons from "@/constants/icons";
 import { useLocalSearchParams, router, usePathname } from "expo-router";
 
-const Search = () => {
+const Search = ({ handleShowFilter }: { handleShowFilter?: Function }) => {
   const path = usePathname();
   const params = useLocalSearchParams<{ query?: string }>();
   const [search, setSearch] = useState(params.query);
@@ -31,7 +31,7 @@ const Search = () => {
         />
       </View>
 
-      <TouchableOpacity>
+      <TouchableOpacity onPress={() => handleShowFilter && handleShowFilter()}>
         <Image source={icons.filter} className="w-5 h-5" />
       </TouchableOpacity>
     </View>

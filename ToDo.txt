@@ -1,0 +1,7 @@
+1- All Reviews Modal (DONE)
+2-Add Review Form Modal (DONE)
+3-open map to show the location
+//   "mapbox access token:"
+//   'pk.eyJ1IjoiYWJkb2NvZGUiLCJhIjoiY2xodDUxeGZqMG1yMTNtbzBvOTM3bHB2byJ9.s5dQOR9QKm2nallRtGJzyg';
+
+4-Add wishlist &wishlist page  (DONE)

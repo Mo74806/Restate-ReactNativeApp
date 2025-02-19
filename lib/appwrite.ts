@@ -20,6 +20,7 @@ export const config = {
     process.env.EXPO_PUBLIC_APPWRITE_GALLERIES_COLLECTION_ID,
   reviewsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_REVIEWS_COLLECTION_ID,
   agentsCollectionId: process.env.EXPO_PUBLIC_APPWRITE_AGENTS_COLLECTION_ID,
+  whislistCollectionId: process.env.EXPO_PUBLIC_APPWRITE_WISHLIST_COLLECTION_ID,
   propertiesCollectionId:
     process.env.EXPO_PUBLIC_APPWRITE_PROPERTIES_COLLECTION_ID,
   bucketId: process.env.EXPO_PUBLIC_APPWRITE_BUCKET_ID,
@@ -105,6 +106,7 @@ export async function getProperties({
   highestPrice,
   bedrooms,
   bathrooms,
+  userId,
 }: {
   filter: string;
   query: string;
@@ -114,28 +116,29 @@ export async function getProperties({
   highestPrice?: number;
   bedrooms?: number;
   bathrooms?: number;
+  userId?: string;
 }) {
   try {
     const buildQuery = [Query.orderDesc("$createdAt")];
-    console.log(query);
 
-    if (propertyType && propertyType?.length > 0)
-      propertyType.map((item: any) =>
-        buildQuery.push(Query.equal("type", item))
+    if (propertyType && propertyType.length > 0) {
+      buildQuery.push(
+        Query.or(propertyType.map((item: any) => Query.equal("type", item)))
       );
-    else {
-      if (filter && filter !== "All")
+    } else {
+      if (filter && filter !== "All") {
         buildQuery.push(Query.equal("type", filter));
+      }
+    }
+    console.log(buildQuery);
+    if (lowestPrice && highestPrice) {
+      buildQuery.push(Query.between("price", lowestPrice, highestPrice));
     }
 
-    if (lowestPrice && highestPrice)
-      buildQuery.push(Query.between("price", lowestPrice, highestPrice));
-
     if (bedrooms) buildQuery.push(Query.equal("bedrooms", bedrooms));
-
     if (bathrooms) buildQuery.push(Query.equal("bathrooms", bathrooms));
 
-    if (query)
+    if (query) {
       buildQuery.push(
         Query.or([
           Query.contains("name", query),
@@ -143,6 +146,7 @@ export async function getProperties({
           Query.contains("type", query),
         ])
       );
+    }
 
     if (limit) buildQuery.push(Query.limit(limit));
 
@@ -151,29 +155,69 @@ export async function getProperties({
       config.propertiesCollectionId!,
       buildQuery
     );
-    return result.documents;
+
+    const properties = result.documents;
+
+    if (userId) {
+      const wishlistResult = await databases.listDocuments(
+        config.databaseId!,
+        config.whislistCollectionId!,
+        [Query.equal("userId", userId)]
+      );
+      const wishlistPropertyIds = new Set(
+        wishlistResult.documents.map((doc) => doc.propertyId)
+      );
+
+      return properties.map((property) => ({
+        ...property,
+        isInWishlist: wishlistPropertyIds.has(property.$id),
+      }));
+    }
+
+    return properties.map((property) => ({
+      ...property,
+      isInWishlist: false,
+    }));
   } catch (error) {
     console.error(error);
     return [];
   }
 }
 
-// write function to get property by id
-export async function getPropertyById({ id }: { id: string }) {
+export async function getPropertyById({
+  id,
+  userId,
+}: {
+  id: string;
+  userId?: string;
+}) {
   try {
     const result = await databases.getDocument(
       config.databaseId!,
       config.propertiesCollectionId!,
       id
     );
-    return result;
+
+    if (userId) {
+      const wishlistResult = await databases.listDocuments(
+        config.databaseId!,
+        config.whislistCollectionId!,
+        [Query.equal("userId", userId), Query.equal("$id", id)]
+      );
+      return {
+        ...result,
+        isInWishlist: wishlistResult.documents.length > 0,
+      };
+    }
+
+    return { ...result, isInWishlist: false };
   } catch (error) {
     console.error(error);
     return null;
   }
 }
 
-export async function getLatestProperties() {
+export async function getLatestProperties({ userId }: { userId: string }) {
   try {
     const result = await databases.listDocuments(
       config.databaseId!,
@@ -181,7 +225,32 @@ export async function getLatestProperties() {
       [Query.orderAsc("$createdAt"), Query.limit(5)]
     );
 
-    return result.documents;
+    const properties = result.documents;
+
+    if (userId) {
+      console.log(userId);
+      const wishlistResult = await databases.listDocuments(
+        config.databaseId!,
+        config.whislistCollectionId!,
+        [Query.equal("userId", userId)]
+      );
+      const wishlistPropertyIds = new Set(
+        wishlistResult.documents.map((doc) => doc.propertyId.$id)
+      );
+      console.log("8888888888888888888888888888888888888888888");
+      console.log(wishlistPropertyIds);
+      console.log("8888888888888888888888888888888888888888888");
+
+      return properties.map((property) => ({
+        ...property,
+        isInWishlist: wishlistPropertyIds.has(property.$id),
+      }));
+    }
+
+    return properties.map((property) => ({
+      ...property,
+      isInWishlist: false,
+    }));
   } catch (error) {
     console.error(error);
     return [];
@@ -226,3 +295,119 @@ export async function getMinMaxSize() {
     return { minPrice: null, maxPrice: null };
   }
 }
+
+// Function to create a review and update the property's rating
+export const createReviewAndUpdateProperty = async (
+  name: string,
+  avatar: string,
+  review: string,
+  rating: number,
+  propertyId: string
+) => {
+  try {
+    // Step 1: Create the review
+    const newReview = await databases.createDocument(
+      config.databaseId!,
+      config.reviewsCollectionId!,
+      ID.unique(),
+      {
+        name,
+        avatar,
+        review,
+        rating,
+        property: propertyId,
+      }
+    );
+
+    console.log("Review Created:", newReview);
+
+    // Step 2: Fetch all reviews for the given property
+    const reviews = await databases.listDocuments(
+      config.databaseId!,
+      config.reviewsCollectionId!,
+      [Query.equal("property", propertyId)]
+    );
+
+    const totalReviews = reviews.total;
+    const totalRating = reviews.documents.reduce(
+      (sum, review) => sum + review.rating,
+      0
+    );
+    const averageRating =
+      totalReviews > 0 ? totalRating / totalReviews : rating;
+
+    // Step 3: Update the property's rating
+    const updatedProperty = await databases.updateDocument(
+      config.databaseId!,
+      config.propertiesCollectionId!,
+      propertyId,
+      {
+        rating: averageRating,
+        // reviewCount: totalReviews, // Optional field to store total reviews
+      }
+    );
+
+    console.log("Property Updated:", updatedProperty);
+
+    return { newReview, updatedProperty };
+  } catch (error) {
+    console.error("Error creating review or updating property:", error);
+    throw error;
+  }
+};
+
+export const toggleWishlist = async (userId: string, propertyId: string) => {
+  try {
+    // Fetch all wishlist entries for the user
+    const response = await databases.listDocuments(
+      config.databaseId!,
+      config.whislistCollectionId!,
+      [Query.equal("userId", userId)]
+    );
+
+    // Manually check if the property is already in the wishlist
+    const wishlistItem = response.documents.find(
+      (doc) => doc.propertyId === propertyId // Ensure direct comparison
+    );
+
+    if (wishlistItem) {
+      // Remove from wishlist
+      await databases.deleteDocument(
+        config.databaseId!,
+        config.whislistCollectionId!,
+        wishlistItem.$id
+      );
+      return { success: true, message: "Removed from wishlist" };
+    } else {
+      // Add property to wishlist
+      await databases.createDocument(
+        config.databaseId!,
+        config.whislistCollectionId!,
+        ID.unique(),
+        {
+          userId,
+          propertyId, // Ensure it's stored as a single string ID
+        }
+      );
+      return { success: true, message: "Added to wishlist" };
+    }
+  } catch (error: any) {
+    console.error("Error toggling wishlist:", error.message || error);
+    return { success: false, message: "Failed to toggle wishlist" };
+  }
+};
+
+export const getWishlistForUser = async ({ userId }: { userId: string }) => {
+  try {
+    const response = await databases.listDocuments(
+      config.databaseId!,
+      config.whislistCollectionId!,
+      [Query.equal("userId", userId)] 
+    );
+
+    return response.documents;
+  } catch (error) {
+    console.error("Error fetching wishlist:", error);
+    return [];
+  }
+};

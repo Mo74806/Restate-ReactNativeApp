@@ -30,23 +30,19 @@ import Rail from "@/components/Rail";
 import RailSelected from "@/components/RailSelected";
 import Label from "@/components/Label";
 import Notch from "@/components/Notch";
-import Slider from "rn-range-slider";
 import RnRangeSlider from "rn-range-slider";
-import { categories, categoriesWithoutAll } from "@/constants/data";
-import images from "@/constants/images";
+import { categoriesWithoutAll } from "@/constants/data";
+import { useGlobalContext } from "@/lib/global-provider";
 const Explore = () => {
+  const { user } = useGlobalContext();
   const [lowestPrice, setLowestPrice] = useState(0);
   const [highestPrice, setHighestPrice] = useState(0);
-  // const [lowestBuildingSize, setLowestBuildingSize] = useState(0);
-  // const [highestBuildingSize, setHighestBuildingSize] = useState(0);
-  const [selectedPropretyType, setSelectedPropertyType] = useState<string[]>(
-    []
-  );
-
+  const [selectedPropretyType, setSelectedPropertyType] = useState<any>([]);
   const [homeDetails, setHomeDetails] = useState({
     bedrooms: 0,
     bathrooms: 0,
   });
+  const [clearFilter, setClearFilter] = useState(true);
   const renderThumb = useCallback(() => <Thumb />, []);
   const renderRail = useCallback(() => <Rail />, []);
   const renderRailSelected = useCallback(() => <RailSelected />, []);
@@ -55,10 +51,10 @@ const Explore = () => {
     []
   );
   const renderNotch = useCallback(() => <Notch />, []);
-  const handleValueChange = useCallback((low: number, high: number) => {
-    // setLow(low);
-    // setHigh(high);
-  }, []);
+  const handleValueChange = (low: number, high: number) => {
+    setLowestPrice(low);
+    setHighestPrice(high);
+  };
   const params = useLocalSearchParams<{ query?: string; filter?: string }>();
   const [moreFilterlistisOpen, setMoreFilterlistIsOpen] = useState(false);
   const {
@@ -68,6 +64,7 @@ const Explore = () => {
   } = useAppwrite({
     fn: getProperties,
     params: {
+      userId: user?.$id!,
       filter: params.filter!,
       query: params.query!,
       propertyType: selectedPropretyType || [],
@@ -90,8 +87,14 @@ const Explore = () => {
   }, [priceData]);
   useEffect(() => {
     refetch({
+      userId: user?.$id!,
       filter: params.filter!,
       query: params.query!,
+      propertyType: selectedPropretyType || [],
+      lowestPrice: lowestPrice ? lowestPrice : 0,
+      highestPrice: highestPrice ? highestPrice : 0,
+      bedrooms: homeDetails.bedrooms ? homeDetails.bedrooms : 0,
+      bathrooms: homeDetails.bathrooms ? homeDetails.bathrooms : 0,
     });
   }, [params.filter, params.query]);
 
@@ -100,7 +103,7 @@ const Explore = () => {
   const handleToggleSetSelectedPropertyType = (category: string) => {
     if (selectedPropretyType.includes(category)) {
       setSelectedPropertyType(
-        selectedPropretyType.filter((item) => item !== category)
+        selectedPropretyType.filter((item: any) => item !== category)
       );
     } else {
       setSelectedPropertyType([...selectedPropretyType, category]);
@@ -113,14 +116,14 @@ const Explore = () => {
   return (
     <SafeAreaView className="h-full bg-white">
       <Modal
-        // onRequestClose={() => setMoreFilterlistIsOpen(false)}
+        onRequestClose={() => setMoreFilterlistIsOpen(false)}
         transparent
         visible={moreFilterlistisOpen}
         animationType="slide"
       >
         {" "}
         <TouchableWithoutFeedback
-        // onPress={() => setMoreFilterlistIsOpen(false)}
+          onPress={() => setMoreFilterlistIsOpen(false)}
         >
           <View className="flex-1 justify-end  bg-black/50">
             <View className="rounded-2xl p-6 px-5 bg-white">
@@ -136,7 +139,15 @@ const Explore = () => {
                   Filter
                 </Text>
 
-                <TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => {
+                    setClearFilter(true);
+                    setLowestPrice(0);
+                    setHighestPrice(0);
+                    setSelectedPropertyType([]);
+                    setHomeDetails({ bedrooms: 0, bathrooms: 0 });
+                  }}
+                >
                   <Text className="text-base font-rubik-bold text-primary-300">
                     Reset
                   </Text>
@@ -155,7 +166,6 @@ const Explore = () => {
                     <ScrollView keyboardShouldPersistTaps="handled">
                       <TouchableWithoutFeedback>
                         <RnRangeSlider
-                          // style={styles.slider}
                           min={lowestPrice}
                           max={highestPrice}
                           step={1000}
@@ -170,7 +180,7 @@ const Explore = () => {
                             high: number,
                             byUser
                           ) => {
-                            byUser && handleValueChange(low, high);
+                            handleValueChange(low, high);
                           }}
                         />
                       </TouchableWithoutFeedback>
@@ -327,7 +337,24 @@ const Explore = () => {
                 </View>
               </View> */}
 
-              <TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  refetch({
+                    userId: user?.$id!,
+                    filter: params?.filter!,
+                    query: params?.query!,
+                    lowestPrice: lowestPrice ? lowestPrice : 0,
+                    highestPrice: highestPrice ? highestPrice : 0,
+                    bedrooms: homeDetails.bedrooms ? homeDetails.bedrooms : 0,
+                    bathrooms: homeDetails.bathrooms
+                      ? homeDetails.bathrooms
+                      : 0,
+                    propertyType: selectedPropretyType!,
+                  });
+                  setClearFilter(false);
+                  setMoreFilterlistIsOpen(false);
+                }}
+              >
                 <View className="mt-7 flex  py-4  justify-center rounded-full bg-primary-300">
                   <Text className="text-white text-center font-rubik-semibold">
                     {" "}
@@ -344,7 +371,11 @@ const Explore = () => {
         data={properties}
         numColumns={2}
         renderItem={({ item }) => (
-          <Card item={item} onPress={() => handleCardPress(item.$id)} />
+          <Card
+            user={user?.$id!}
+            item={item}
+            onPress={() => handleCardPress(item.$id)}
+          />
         )}
         keyExtractor={(item) => item.$id}
         contentContainerClassName="pb-32"
@@ -362,9 +393,9 @@ const Explore = () => {
             <View className="flex flex-row items-center justify-between mt-5">
               <TouchableOpacity
                 onPress={() => router.back()}
-                className="flex flex-row bg-primary-200 rounded-full size-11 items-center justify-center"
+                className="flex flex-row bg-primary-200 rounded-full w-11 h-11 items-center justify-center"
               >
-                <Image source={icons.backArrow} className="size-5" />
+                <Image source={icons.backArrow} className="w-5 h-5" />
               </TouchableOpacity>
 
               <Text className="text-base mr-2 text-center font-rubik-medium text-black-300">
@@ -373,10 +404,10 @@ const Explore = () => {
               <Image source={icons.bell} className="w-6 h-6" />
             </View>
 
-            <Search />
+            <Search handleShowFilter={() => setMoreFilterlistIsOpen(true)} />
 
             <View className="mt-5">
-              <Filters />
+              {clearFilter && <Filters />}
 
               <Text className="text-xl font-rubik-bold text-black-300 mt-5">
                 Found {properties?.length} Properties

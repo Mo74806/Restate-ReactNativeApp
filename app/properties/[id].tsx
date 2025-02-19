@@ -7,31 +7,160 @@ import {
   View,
   Dimensions,
   Platform,
+  Modal,
+  TouchableWithoutFeedback,
+  TextInput,
+  ActivityIndicator,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 
 import icons from "@/constants/icons";
 import images from "@/constants/images";
 import { facilities } from "@/constants/data";
+import { Rating, AirbnbRating } from "react-native-ratings";
 
-import { getPropertyById } from "@/lib/appwrite";
+import { createReviewAndUpdateProperty, getPropertyById } from "@/lib/appwrite";
 import { useAppwrite } from "@/lib/useAppwrrite";
 import Comment from "@/components/Comment";
+import { useState } from "react";
+import { useGlobalContext } from "@/lib/global-provider";
+import { SafeAreaView } from "react-native-safe-area-context";
+import MapComponent from "@/components/MapComponent";
 
 const Property = () => {
+  const [showAllReview, setShowAllReview] = useState(false);
+  const [loadingReviewButton, setLoadingReviewButton] = useState(false);
+  const { user } = useGlobalContext();
   const { id } = useLocalSearchParams<{ id?: string }>();
-
+  const [showAddReview, setShowAddReview] = useState(false);
   const windowHeight = Dimensions.get("window").height;
+  const [review, setReview] = useState("");
+  const [rating, setRating] = useState(0);
 
-  const { data: property } = useAppwrite({
-    fn: getPropertyById,
-    params: {
-      id: id!,
-    },
-  });
+  const { data: property, loading }: { data: any; loading: boolean } =
+    useAppwrite({
+      fn: getPropertyById,
+      params: {
+        id: id!,
+        userId: user?.$id!,
+      },
+    });
 
+  console.log(user);
+  const handleAddReview = async () => {
+    const result = await createReviewAndUpdateProperty(
+      user?.name!,
+      user?.avatar!,
+      review,
+      rating,
+      property.$id
+    );
+    if (result) {
+      setShowAddReview(false);
+      getPropertyById({ id: id!, userId: user?.$id! });
+    }
+    setShowAddReview(false);
+  };
+
+  if (loading) {
+    return (
+      <View className="flex-1 items-center justify-center">
+        <ActivityIndicator className="text-primary-300" size="large" />
+      </View>
+    );
+  }
   return (
     <View>
+      {/* <Modal visible={true}>
+        {" "}
+        <TouchableWithoutFeedback>
+          <View className="flex-1 justify-center  bg-black/50">
+            <View className="rounded-2xl p-6 px-5 mx-4 bg-white"></View>
+            <SafeAreaView style={{ flex: 1 }}>
+              <MapComponent latitude={37.7749} longitude={-122.4194} />
+            </SafeAreaView>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal> */}
+      <Modal
+        onRequestClose={() => setShowAddReview(false)}
+        transparent
+        visible={showAddReview}
+        animationType="slide"
+      >
+        {" "}
+        <TouchableWithoutFeedback onPress={() => setShowAddReview(false)}>
+          <View className="flex-1 justify-center  bg-black/50">
+            <View className="rounded-2xl p-6 px-5 mx-4 bg-white">
+              <View className="flex flex-row items-center justify-center">
+                <Rating
+                  showRating
+                  startingValue={rating}
+                  onFinishRating={(value: number) => {
+                    setRating(value);
+                  }}
+                  style={{ paddingVertical: 10 }}
+                  ratingTextColor="black"
+                />
+              </View>
+              <View className="flex flex-row">
+                <Text className="text-black-300 text-xl font-rubik-bold text-start">
+                  Review
+                </Text>
+              </View>
+              <View className="flex  border border-primary-300 min-h-[60px] rounded-[8px] flex-row items-center justify-center">
+                <TextInput
+                  style={{ color: "black" }}
+                  className="flex-1    text-white font-semibold text-base"
+                  value={review}
+                  onChangeText={(value: string) => setReview(value)}
+                  placeholder={"Write a review"}
+                  placeholderTextColor="#7b7b8b"
+                />
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  setLoadingReviewButton(true);
+                  handleAddReview();
+                }}
+                className=" mt-4 items-center justify-center bg-primary-300 py-3 rounded-full shadow-md shadow-zinc-400"
+              >
+                {!loadingReviewButton ? (
+                  <Text className="text-white text-lg text-center font-rubik-bold">
+                    Submit
+                  </Text>
+                ) : (
+                  <View className="text-white text-lg text-center font-rubik-bold">
+                    <ActivityIndicator className="text-white" size="large" />
+                  </View>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableWithoutFeedback>
+      </Modal>
+      <Modal
+        onRequestClose={() => setShowAllReview(false)}
+        transparent
+        visible={showAllReview}
+        animationType="slide"
+      >
+        {" "}
+        <TouchableWithoutFeedback onPress={() => setShowAllReview(false)}>
+          {/* <ScrollView> */}
+          <View className="flex-1 justify-center  bg-black/50">
+            <View className="rounded-2xl p-6 px-5 mx-4 bg-white">
+              {property?.reviews &&
+                property?.reviews.map((item: any, index: number) => (
+                  <View key={index} className="mt-5">
+                    <Comment item={item} />
+                  </View>
+                ))}
+            </View>
+          </View>
+          {/* </ScrollView> */}
+        </TouchableWithoutFeedback>
+      </Modal>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerClassName="pb-32 bg-white"
@@ -229,28 +358,43 @@ const Property = () => {
             />
           </View>
 
-          {property?.reviews.length > 0 && (
-            <View className="mt-7">
-              <View className="flex flex-row items-center justify-between">
-                <View className="flex flex-row items-center">
-                  <Image source={icons.star} className="w-6 h-6" />
-                  <Text className="text-black-300 text-xl font-rubik-bold ml-2">
-                    {property?.rating} ({property?.reviews.length} reviews)
-                  </Text>
-                </View>
+          {/* {property?.reviews.length > 0 && ( */}
+          <View className="mt-7">
+            <View className="flex flex-row items-center justify-between">
+              <View className="flex flex-row items-center">
+                <Image source={icons.star} className="w-6 h-6" />
+                <Text className="text-black-300 text-xl font-rubik-bold ml-2">
+                  {property?.reviews.length > 0 ? property?.rating : "N/A"} (
+                  {property?.reviews.length} reviews)
+                </Text>
+              </View>
 
-                <TouchableOpacity>
+              {property?.reviews.length > 1 && (
+                <TouchableOpacity onPress={() => setShowAllReview(true)}>
                   <Text className="text-primary-300 text-base font-rubik-bold">
                     View All
                   </Text>
                 </TouchableOpacity>
-              </View>
+              )}
+            </View>
 
+            {property?.reviews[0] && (
               <View className="mt-5">
                 <Comment item={property?.reviews[0]} />
               </View>
+            )}
+            <View className="mt-5">
+              <TouchableOpacity
+                onPress={() => setShowAddReview(true)}
+                className="flex-1 flex flex-row items-center justify-center bg-primary-300 py-3 rounded-full shadow-md shadow-zinc-400"
+              >
+                <Text className="text-white text-lg text-center font-rubik-bold">
+                  Add Review
+                </Text>
+              </TouchableOpacity>
             </View>
-          )}
+          </View>
+          {/* )} */}
         </View>
       </ScrollView>
 

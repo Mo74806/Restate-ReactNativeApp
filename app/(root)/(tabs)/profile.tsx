@@ -14,6 +14,7 @@ import { useGlobalContext } from "@/lib/global-provider";
 
 import icons from "@/constants/icons";
 import { settings } from "@/constants/data";
+import { router } from "expo-router";
 
 interface SettingsItemProp {
   icon: ImageSourcePropType;
@@ -84,6 +85,13 @@ const Profile = () => {
         </View>
 
         <View className="flex flex-col mt-10">
+          <SettingsItem
+            onPress={() => {
+              router.push("/wishList");
+            }}
+            icon={icons.shield}
+            title="My Wishlist"
+          />
           <SettingsItem icon={icons.calendar} title="My Bookings" />
           <SettingsItem icon={icons.wallet} title="Payments" />
         </View>

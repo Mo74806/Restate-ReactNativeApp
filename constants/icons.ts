@@ -6,6 +6,7 @@ import bell from "@/assets/icons/bell.png";
 import filter from "@/assets/icons/filter.png";
 import star from "@/assets/icons/star.png";
 import heart from "@/assets/icons/heart.png";
+import heart2 from "@/assets/icons/heart2.png";
 import backArrow from "@/assets/icons/back-arrow.png";
 import calendar from "@/assets/icons/calendar.png";
 import info from "@/assets/icons/info.png";
@@ -56,6 +57,7 @@ export default {
   bed,
   bath,
   area,
+  heart2,
   chat,
   phone,
   carPark,

@@ -22,11 +22,15 @@ import { router, useLocalSearchParams } from "expo-router";
 
 const index = () => {
   const { user } = useGlobalContext();
+
   const params = useLocalSearchParams<{ query?: string; filter?: string }>();
 
   const { data: latestProperties, loading: latestPropertiesLoading } =
     useAppwrite({
       fn: getLatestProperties,
+      params: {
+        userId: user ? user?.$id! : "",
+      },
     });
 
   const {
@@ -36,6 +40,7 @@ const index = () => {
   } = useAppwrite({
     fn: getProperties,
     params: {
+      userId: user?.$id!,
       filter: params.filter!,
       query: params.query!,
       limit: 6,
@@ -44,20 +49,25 @@ const index = () => {
   });
   useEffect(() => {
     refetch({
+      userId: user?.$id!,
       filter: params.filter!,
       query: params.query!,
       limit: 6,
     });
   }, [params.filter, params.query]);
   const handleCardPress = (id: string) => router.push(`/properties/${id}`);
-
+  console.log(latestProperties);
   return (
     <SafeAreaView className="h-full bg-white">
       <FlatList
         data={properties}
         numColumns={2}
         renderItem={({ item }) => (
-          <Card item={item} onPress={() => handleCardPress(item.$id)} />
+          <Card
+            user={user?.$id!}
+            item={item}
+            onPress={() => handleCardPress(item.$id)}
+          />
         )}
         keyExtractor={(item: any) => item.$id}
         contentContainerClassName="pb-32"
@@ -114,6 +124,7 @@ const index = () => {
                   data={latestProperties}
                   renderItem={({ item }) => (
                     <FeaturedCard
+                      user={user?.$id!}
                       item={item}
                       onPress={() => handleCardPress(item.$id)}
                     />

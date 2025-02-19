@@ -1,14 +1,29 @@
 import icons from "@/constants/icons";
 import images from "@/constants/images";
+import { toggleWishlist } from "@/lib/appwrite";
+import { useEffect, useState } from "react";
 import { Image, Text, TouchableOpacity, View } from "react-native";
 import { Models } from "react-native-appwrite";
 
 interface Props {
   item: Models.Document;
   onPress?: () => void;
+  user: string;
 }
 
-export const FeaturedCard = ({ item, onPress }: Props) => {
+export const FeaturedCard = ({ item, onPress, user }: Props) => {
+  const [isInWishlist, setIsInWishlist] = useState<boolean>(false);
+  useEffect(() => {
+    setIsInWishlist(item?.isInWishlist);
+  }, []);
+  const handleToggleAddToWishList = async () => {
+    try {
+      await toggleWishlist(user, item.$id);
+      setIsInWishlist((prev) => !prev);
+    } catch (error) {
+      console.log(error);
+    }
+  };
   return (
     <TouchableOpacity
       onPress={onPress}
@@ -46,14 +61,32 @@ export const FeaturedCard = ({ item, onPress }: Props) => {
           <Text className="text-xl font-rubik-extrabold text-white">
             ${item.price}
           </Text>
-          <Image source={icons.heart} className="w-5 h-5" />
+          <TouchableOpacity onPress={handleToggleAddToWishList}>
+            <Image
+              source={isInWishlist ? icons.heart2 : icons.heart}
+              tintColor={isInWishlist ? "red" : "white"}
+              className="w-5 h-5"
+            />
+          </TouchableOpacity>
         </View>
       </View>
     </TouchableOpacity>
   );
 };
 
-export const Card = ({ item, onPress }: Props) => {
+export const Card = ({ item, onPress, user }: Props) => {
+  const [isInWishlist, setIsInWishlist] = useState<boolean>(false);
+  useEffect(() => {
+    setIsInWishlist(item?.isInWishlist);
+  }, []);
+  const handleToggleAddToWishList = async () => {
+    try {
+      await toggleWishlist(user, item.$id);
+      setIsInWishlist((prev) => !prev);
+    } catch (error) {
+      console.log(error);
+    }
+  };
   return (
     <TouchableOpacity
       className="flex-1 w-full mt-4 px-3 py-4 rounded-lg bg-white shadow-lg shadow-black-100/70 relative"
@@ -80,11 +113,13 @@ export const Card = ({ item, onPress }: Props) => {
           <Text className="text-base font-rubik-bold text-primary-300">
             ${item.price}
           </Text>
-          <Image
-            source={icons.heart}
-            className="w-5 h-5 mr-2"
-            tintColor="#191D31"
-          />
+          <TouchableOpacity onPress={handleToggleAddToWishList}>
+            <Image
+              className="w-5 h-5 mr-2"
+              source={isInWishlist ? icons.heart2 : icons.heart}
+              tintColor={isInWishlist ? "red" : "#191D31"}
+            />
+          </TouchableOpacity>
         </View>
       </View>
     </TouchableOpacity>
